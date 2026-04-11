@@ -1,157 +1,128 @@
-# filename: tcm_constitution_app_with_advice.py
-
+# app.py
 import streamlit as st
-import matplotlib.pyplot as plt
-import numpy as np
-from io import BytesIO
-from reportlab.lib.pagesizes import A4
-from reportlab.lib.utils import ImageReader
+import yfinance as yf
+import pandas as pd
+import plotly.express as px
 
-# -------------------------
-# 题目和体质分类
-# -------------------------
-questions = {
-    "平和质": ["你精力充沛吗？", "你睡眠良好吗？", "你食欲正常吗？", "你适应环境能力强吗？"],
-    "气虚质": ["你容易疲劳吗？", "你说话声音低弱吗？", "你容易出虚汗吗？", "你容易心慌吗？"],
-    "阳虚质": ["你手脚发凉吗？", "你怕冷吗？", "你吃凉的会腹泻吗？"],
-    "阴虚质": ["你容易口干吗？", "你手脚心发热吗？", "你容易失眠吗？"],
-    "痰湿质": ["你体型偏胖吗？", "你容易困倦吗？", "你嘴里发黏吗？"],
-    "湿热质": ["你面部容易出油吗？", "你口苦吗？", "你大便黏滞吗？"],
-    "血瘀质": ["你有身体刺痛感吗？", "你肤色晦暗吗？", "你容易有黑眼圈吗？"],
-    "气郁质": ["你容易情绪低落吗？", "你容易焦虑吗？", "你爱叹气吗？"],
-    "特禀质": ["你容易过敏吗？", "你对气味敏感吗？", "你没感冒也打喷嚏吗？", "你皮肤易起荨麻疹吗？"]
-}
-
-# -------------------------
-# 体质描述与建议
-# -------------------------
-advice = {
-    "平和质": {
-        "description": "体质均衡，精力充沛，适应环境能力强。",
-        "suggestion": "保持健康生活习惯，均衡饮食，适度运动。"
-    },
-    "气虚质": {
-        "description": "容易疲劳，声音低弱，出虚汗。",
-        "suggestion": "注意休息，饮食温和，多进行增强体质的运动。"
-    },
-    "阳虚质": {
-        "description": "手脚发凉，怕冷，容易腹泻。",
-        "suggestion": "注意保暖，适量运动，多吃温性食物。"
-    },
-    "阴虚质": {
-        "description": "容易口干，手脚心发热，失眠。",
-        "suggestion": "避免辛辣刺激，多喝水，多吃滋阴食物。"
-    },
-    "痰湿质": {
-        "description": "体型偏胖，困倦，口中黏腻。",
-        "suggestion": "注意饮食清淡，适量运动，保持良好作息。"
-    },
-    "湿热质": {
-        "description": "面部易出油，口苦，大便黏滞。",
-        "suggestion": "饮食清淡，多喝水，注意情绪调节。"
-    },
-    "血瘀质": {
-        "description": "肤色暗沉，有刺痛感，黑眼圈明显。",
-        "suggestion": "适量运动，促进血液循环，保持心情舒畅。"
-    },
-    "气郁质": {
-        "description": "情绪易低落，焦虑，常叹气。",
-        "suggestion": "保持心情愉快，适度运动和社交，减压放松。"
-    },
-    "特禀质": {
-        "description": "容易过敏，对气味敏感，皮肤易起荨麻疹。",
-        "suggestion": "避免过敏源，注意皮肤护理，规律作息。"
-    }
-}
-
-# -------------------------
 # 页面设置
-# -------------------------
-st.set_page_config(page_title="中医体质自测", layout="centered")
-st.markdown("<h1 style='text-align:center; color:#4B8BBE;'>中医体质自测问卷</h1>", unsafe_allow_html=True)
-st.markdown("<h4 style='text-align:center; color:#555555;'>请根据自己的情况选择分数：1=完全不符合，5=完全符合</h4>", unsafe_allow_html=True)
-st.markdown("---")
+st.set_page_config(page_title="Tech Giants Financial Comparison", layout="wide")
 
-# -------------------------
-# 用户评分输入
-# -------------------------
-scores = {}
-for constitution, qs in questions.items():
-    st.markdown(f"<div style='background-color:#F0F0F0;padding:15px;border-radius:10px;margin-bottom:10px'>"
-                f"<h3 style='text-align:center;color:#333333;'>{constitution}</h3></div>", unsafe_allow_html=True)
-    scores[constitution] = []
-    for q in qs:
-        st.markdown(f"<p style='text-align:center;font-size:16px;color:#333;'>{q}</p>", unsafe_allow_html=True)
-        score = st.radio("", options=[1, 2, 3, 4, 5], index=2, horizontal=True, key=f"{constitution}_{q}")
-        scores[constitution].append(score)
+# 标题
+st.markdown("<h1 style='text-align: center; color: #1E90FF;'>Tech Giants Financial Comparison Tool</h1>", unsafe_allow_html=True)
+st.markdown("<p style='text-align: center;'>Compare financial indicators of top global tech companies. Ideal for investors or business students.</p>", unsafe_allow_html=True)
 
-st.markdown("---")
+# ----------------------
+# Sidebar input
+# ----------------------
+st.sidebar.header("Settings")
+company_options = ["AAPL", "MSFT", "GOOGL"]
+selected_companies = st.sidebar.multiselect("Select Companies", company_options, default=company_options)
 
-# -------------------------
-# 生成 PDF 按钮
-# -------------------------
-if st.button("生成 PDF 报告"):
-    percentages = {c: round(sum(v)/ (5*len(v)) *100,1) for c,v in scores.items()}
-    main_constitution = max(percentages, key=percentages.get)
+years_range = st.sidebar.slider("Select Year Range", 2018, 2023, (2020, 2023))
 
-    # 雷达图
-    categories = list(percentages.keys())
-    values = list(percentages.values())
-    N = len(categories)
-    angles = np.linspace(0, 2*np.pi, N, endpoint=False).tolist()
-    values += values[:1]
-    angles += angles[:1]
+metric_options = ["Market Cap", "P/E", "ROE", "Gross Margin", "Net Margin", "Debt to Equity"]
+selected_metric = st.sidebar.selectbox("Select Financial Metric", metric_options)
 
-    fig, ax = plt.subplots(figsize=(5,5), subplot_kw=dict(polar=True))
-    ax.plot(angles, values, 'o-', linewidth=2, label="体质百分比", color="#4B8BBE")
-    ax.fill(angles, values, alpha=0.25, color="#4B8BBE")
-    ax.set_thetagrids(np.degrees(angles[:-1]), categories)
-    ax.set_ylim(0, 100)
-    for i,val in enumerate(values[:-1]):
-        ax.text(angles[i], val+5, f"{val}%", ha='center', va='bottom', fontsize=9, color='blue')
-    ax.set_title("中医体质雷达图", fontsize=14)
-    buf = BytesIO()
-    plt.savefig(buf, format='png', bbox_inches='tight')
-    buf.seek(0)
-    plt.close(fig)
+# ----------------------
+# Data fetching
+# ----------------------
+@st.cache_data
+def get_financial_data(ticker):
+    stock = yf.Ticker(ticker)
+    hist = stock.history(period="max")
+    info = stock.info
+    metrics = {
+        "Market Cap": info.get("marketCap"),
+        "P/E": info.get("trailingPE"),
+        "ROE": info.get("returnOnEquity"),
+        "Gross Margin": info.get("grossMargins"),
+        "Net Margin": info.get("profitMargins"),
+        "Debt to Equity": info.get("debtToEquity")
+    }
+    return hist, metrics
 
-    # PDF
-    pdf_buf = BytesIO()
-    c = canvas.Canvas(pdf_buf, pagesize=A4)
-    width, height = A4
+data_dict = {}
+metrics_df = pd.DataFrame(columns=["Company"] + metric_options)
 
-    c.setFont("Helvetica-Bold", 20)
-    c.drawCentredString(width/2, height-50, "中医体质自测报告")
+for company in selected_companies:
+    hist, metrics = get_financial_data(company)
+    data_dict[company] = hist
+    row = {"Company": company}
+    row.update(metrics)
+    metrics_df = pd.concat([metrics_df, pd.DataFrame([row])], ignore_index=True)
 
-    # 雷达图
-    img = ImageReader(buf)
-    c.drawImage(img, width/2-150, height-450, width=300, height=300)
+# ----------------------
+# Stock price trend
+# ----------------------
+st.markdown("<h2 style='text-align:center; color: #1E90FF;'>Stock Price Trend</h2>", unsafe_allow_html=True)
+if selected_companies:
+    fig = px.line()
+    for company in selected_companies:
+        df = data_dict[company]
+        df_filtered = df[(df.index.year >= years_range[0]) & (df.index.year <= years_range[1])]
+        fig.add_scatter(x=df_filtered.index, y=df_filtered["Close"], mode="lines", name=company)
+    fig.update_layout(title="Stock Price Trend", xaxis_title="Date", yaxis_title="Close Price (USD)", legend_title="Company", template="plotly_white")
+    st.plotly_chart(fig, use_container_width=True)
 
-    # 主体质描述与建议
-    c.setFont("Helvetica-Bold", 14)
-    c.drawString(50, height-500, f"主要体质：{main_constitution}")
-    c.setFont("Helvetica", 12)
-    c.drawString(55, height-520, f"描述：{advice[main_constitution]['description']}")
-    c.drawString(55, height-540, f"建议：{advice[main_constitution]['suggestion']}")
+# ----------------------
+# Financial metric comparison
+# ----------------------
+st.markdown(f"<h2 style='text-align:center; color: #1E90FF;'>{selected_metric} Comparison</h2>", unsafe_allow_html=True)
+if not metrics_df.empty:
+    fig2 = px.bar(metrics_df, x="Company", y=selected_metric, text=selected_metric, color="Company", color_discrete_sequence=px.colors.qualitative.Set2)
+    fig2.update_layout(title=f"{selected_metric} Comparison", yaxis_title=selected_metric, template="plotly_white")
+    st.plotly_chart(fig2, use_container_width=True)
 
-    # 各体质百分比
-    c.setFont("Helvetica-Bold", 14)
-    y = height-570
-    c.drawString(50, y, "各体质倾向百分比：")
-    y -= 20
-    c.setFont("Helvetica", 12)
-    for k,v in percentages.items():
-        c.drawString(60, y, f"{k}: {v}%")
-        y -= 18
+# ----------------------
+# Data table
+# ----------------------
+st.markdown("<h2 style='text-align:center; color: #1E90FF;'>Financial Metrics Table</h2>", unsafe_allow_html=True)
+st.dataframe(metrics_df.set_index("Company"), use_container_width=True)
 
-    c.showPage()
-    c.save()
-    pdf_buf.seek(0)
+# ----------------------
+# Automated financial analysis with cards
+# ----------------------
+st.markdown("<h2 style='text-align:center; color: #1E90FF;'>Automated Financial Analysis</h2>", unsafe_allow_html=True)
+if not metrics_df.empty:
+    try:
+        # Numeric conversion
+        metrics_df[selected_metric] = pd.to_numeric(metrics_df[selected_metric], errors='coerce')
+        metrics_df["Net Margin"] = pd.to_numeric(metrics_df["Net Margin"], errors='coerce')
+        metrics_df["ROE"] = pd.to_numeric(metrics_df["ROE"], errors='coerce')
+        metrics_df["Debt to Equity"] = pd.to_numeric(metrics_df["Debt to Equity"], errors='coerce')
+        metrics_df["P/E"] = pd.to_numeric(metrics_df["P/E"], errors='coerce')
 
-    st.success("PDF 报告生成成功！")
-    st.download_button("下载 PDF 报告", pdf_buf, "体质自测报告.pdf", "application/pdf")
+        # Profitability card
+        top_profit_idx = metrics_df[["Net Margin","ROE"]].mean(axis=1).idxmax()
+        top_profit_company = metrics_df.loc[top_profit_idx,"Company"]
+        st.markdown(f"<div style='border:1px solid #1E90FF; padding:10px; border-radius:5px; background-color:#F0F8FF;'>"
+                    f"<h4>Profitability Analysis</h4>"
+                    f"<p>Based on <b>Net Margin</b> and <b>ROE</b>, <b>{top_profit_company}</b> demonstrates the strongest profitability among the selected companies, indicating efficient management and good cost control.</p>"
+                    f"</div>", unsafe_allow_html=True)
 
-    # 页面显示
-    st.markdown(f"### 主要体质：{main_constitution}")
-    st.markdown(f"**描述**：{advice[main_constitution]['description']}")
-    st.markdown(f"**建议**：{advice[main_constitution]['suggestion']}")
+        # Growth card
+        price_start = {}
+        price_end = {}
+        for company in selected_companies:
+            df = data_dict[company]
+            df_filtered = df[(df.index.year >= years_range[0]) & (df.index.year <= years_range[1])]
+            price_start[company] = df_filtered["Close"].iloc[0]
+            price_end[company] = df_filtered["Close"].iloc[-1]
+        growth_rate = {c: (price_end[c]-price_start[c])/price_start[c]*100 for c in selected_companies}
+        top_growth = max(growth_rate, key=growth_rate.get)
+        st.markdown(f"<div style='border:1px solid #32CD32; padding:10px; border-radius:5px; background-color:#F0FFF0;'>"
+                    f"<h4>Growth Analysis</h4>"
+                    f"<p>Considering stock price trend over the selected years, <b>{top_growth}</b> shows the highest growth ({growth_rate[top_growth]:.2f}%), reflecting strong market performance and investor confidence.</p>"
+                    f"</div>", unsafe_allow_html=True)
+
+        # Risk card
+        risk_score = metrics_df["Debt to Equity"] + metrics_df["P/E"]
+        safest_idx = risk_score.idxmin()
+        safest_company = metrics_df.loc[safest_idx, "Company"]
+        st.markdown(f"<div style='border:1px solid #FF4500; padding:10px; border-radius:5px; background-color:#FFF5F0;'>"
+                    f"<h4>Risk Analysis</h4>"
+                    f"<p>With relatively low <b>Debt to Equity</b> and <b>P/E</b>, <b>{safest_company}</b> presents the lowest financial risk compared to peers, making it more resilient to market fluctuations.</p>"
+                    f"</div>", unsafe_allow_html=True)
+
+    except Exception as e:
+        st.write("Error generating analysis:", e)
