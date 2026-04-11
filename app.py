@@ -1,141 +1,138 @@
+# filename: tcm_constitution_app_export.py
+
 import streamlit as st
 import matplotlib.pyplot as plt
 import numpy as np
-import json
-import os
-from datetime import datetime
+import pandas as pd
+import json, os
 
-st.title("🩺 中医体质测试")
+# -------------------------
+# 题目和体质分类
+# -------------------------
+questions = {
+    "平和质": [
+        "你精力充沛吗？",
+        "你睡眠良好吗？",
+        "你食欲正常吗？",
+        "你适应环境能力强吗？"
+    ],
+    "气虚质": [
+        "你容易疲劳吗？",
+        "你说话声音低弱吗？",
+        "你容易出虚汗吗？",
+        "你容易心慌吗？"
+    ],
+    "阳虚质": [
+        "你手脚发凉吗？",
+        "你怕冷吗？",
+        "你吃凉的会腹泻吗？"
+    ],
+    "阴虚质": [
+        "你容易口干吗？",
+        "你手脚心发热吗？",
+        "你容易失眠吗？"
+    ],
+    "痰湿质": [
+        "你体型偏胖吗？",
+        "你容易困倦吗？",
+        "你嘴里发黏吗？"
+    ],
+    "湿热质": [
+        "你面部容易出油吗？",
+        "你口苦吗？",
+        "你大便黏滞吗？"
+    ],
+    "血瘀质": [
+        "你有身体刺痛感吗？",
+        "你肤色晦暗吗？",
+        "你容易有黑眼圈吗？"
+    ],
+    "气郁质": [
+        "你容易情绪低落吗？",
+        "你容易焦虑吗？",
+        "你爱叹气吗？"
+    ],
+    "特禀质": [
+        "你容易过敏吗？",
+        "你对气味敏感吗？",
+        "你没感冒也打喷嚏吗？",
+        "你皮肤易起荨麻疹吗？"
+    ]
+}
 
-# ===== 30题 中医体质测试题库 =====
-QUESTIONS = [
-    # 平和质 4题
-    {"q": "你精力充沛吗？", "type": "平和"},
-    {"q": "你睡眠良好吗？", "type": "平和"},
-    {"q": "你食欲正常吗？", "type": "平和"},
-    {"q": "你适应环境能力强吗？", "type": "平和"},
+# -------------------------
+# Streamlit 页面设置
+# -------------------------
+st.set_page_config(page_title="中医体质自测", layout="wide")
+st.title("中医体质自测问卷")
+st.write("请根据自己的情况打分：1=完全不符合，5=完全符合")
 
-    # 气虚质 4题
-    {"q": "你容易疲劳吗？", "type": "气虚"},
-    {"q": "你说话声音低弱吗？", "type": "气虚"},
-    {"q": "你容易出虚汗吗？", "type": "气虚"},
-    {"q": "你容易心慌吗？", "type": "气虚"},
+# -------------------------
+# 用户评分输入
+# -------------------------
+scores = {}
+for constitution, qs in questions.items():
+    st.subheader(constitution)
+    scores[constitution] = []
+    for q in qs:
+        score = st.slider(q, 1, 5, 3)
+        scores[constitution].append(score)
 
-    # 阳虚质 3题
-    {"q": "你手脚发凉吗？", "type": "阳虚"},
-    {"q": "你怕冷吗？", "type": "阳虚"},
-    {"q": "你吃凉的会腹泻吗？", "type": "阳虚"},
+# -------------------------
+# 计算体质百分比
+# -------------------------
+if st.button("计算体质倾向"):
+    percentages = {}
+    for constitution, values in scores.items():
+        max_score = 5 * len(values)
+        percentages[constitution] = round(sum(values)/max_score*100, 1)
 
-    # 阴虚质 3题
-    {"q": "你容易口干吗？", "type": "阴虚"},
-    {"q": "你手脚心发热吗？", "type": "阴虚"},
-    {"q": "你容易失眠吗？", "type": "阴虚"},
+    st.subheader("各体质倾向百分比")
+    st.write(percentages)
 
-    # 痰湿质 3题
-    {"q": "你体型偏胖吗？", "type": "痰湿"},
-    {"q": "你容易困倦吗？", "type": "痰湿"},
-    {"q": "你嘴里发黏吗？", "type": "痰湿"},
-
-    # 湿热质 3题
-    {"q": "你面部容易出油吗？", "type": "湿热"},
-    {"q": "你口苦吗？", "type": "湿热"},
-    {"q": "你大便黏滞吗？", "type": "湿热"},
-
-    # 血瘀质 3题
-    {"q": "你有身体刺痛感吗？", "type": "血瘀"},
-    {"q": "你肤色晦暗吗？", "type": "血瘀"},
-    {"q": "你容易有黑眼圈吗？", "type": "血瘀"},
-
-    # 气郁质 3题
-    {"q": "你容易情绪低落吗？", "type": "气郁"},
-    {"q": "你容易焦虑吗？", "type": "气郁"},
-    {"q": "你爱叹气吗？", "type": "气郁"},
-
-    # 特禀质 4题
-    {"q": "你容易过敏吗？", "type": "特禀"},
-    {"q": "你对气味敏感吗？", "type": "特禀"},
-    {"q": "你没感冒也打喷嚏吗？", "type": "特禀"},
-    {"q": "你皮肤易起荨麻疹吗？", "type": "特禀"},
-]
-
-# ===== 答题 =====
-answers = []
-st.write("请打分（1=完全不符合，5=完全符合）")
-
-for item in QUESTIONS:
-    val = st.slider(item["q"], 1, 5, 3)
-    answers.append((item["type"], val))
-
-# ===== 计算 =====
-def calculate(answers):
-    raw = {}
-    count = {}
-
-    for t, v in answers:
-        raw[t] = raw.get(t, 0) + v
-        count[t] = count.get(t, 0) + 1
-
-    result = {}
-    for t in raw:
-        max_s = count[t] * 5
-        min_s = count[t] * 1
-        score = (raw[t] - min_s) / (max_s - min_s) * 100
-        result[t] = round(score, 2)
-
-    return result
-
-# ===== 雷达图 =====
-def draw_chart(result):
-    labels = list(result.keys())
-    values = list(result.values())
-
-    angles = np.linspace(0, 2*np.pi, len(labels), endpoint=False)
+    # -------------------------
+    # 绘制雷达图
+    # -------------------------
+    categories = list(percentages.keys())
+    values = list(percentages.values())
+    N = len(categories)
+    angles = np.linspace(0, 2 * np.pi, N, endpoint=False).tolist()
     values += values[:1]
-    angles = np.concatenate((angles, [angles[0]]))
+    angles += angles[:1]
 
-    fig = plt.figure(figsize=(6,6))
-    ax = plt.subplot(111, polar=True)
-
-    ax.plot(angles, values)
-    ax.fill(angles, values, alpha=0.2)
-
-    ax.set_thetagrids(angles[:-1]*180/np.pi, labels)
-
-    return fig
-
-# ===== 保存 =====
-def save(result):
-    os.makedirs("data", exist_ok=True)
-    file = "data/history.json"
-
-    try:
-        with open(file, "r") as f:
-            data = json.load(f)
-    except:
-        data = []
-
-    data.append({
-        "time": datetime.now().isoformat(),
-        "result": result
-    })
-
-    with open(file, "w") as f:
-        json.dump(data, f, indent=2)
-
-# ===== 按钮 =====
-if st.button("生成结果"):
-
-    result = calculate(answers)
-
-    st.subheader("📊 体质百分比")
-    for k, v in result.items():
-        st.write(f"{k}: {v}%")
-
-    st.subheader("📈 雷达图")
-    fig = draw_chart(result)
+    fig, ax = plt.subplots(figsize=(6,6), subplot_kw=dict(polar=True))
+    ax.plot(angles, values, 'o-', linewidth=2, label="体质倾向")
+    ax.fill(angles, values, alpha=0.25)
+    ax.set_thetagrids(np.degrees(angles[:-1]), categories)
+    ax.set_ylim(0, 100)
+    ax.set_title("中医体质雷达图", va='bottom')
     st.pyplot(fig)
 
-    save(result)
+    # -------------------------
+    # 保存记录
+    # -------------------------
+    if not os.path.exists("records"):
+        os.mkdir("records")
+    record = {"scores": scores, "percentages": percentages}
+    record_file = "records/record.json"
+    with open(record_file, "w", encoding="utf-8") as f:
+        json.dump(record, f, ensure_ascii=False, indent=2)
+    st.success("测试记录已保存！")
 
-    st.success("已保存")
-   
+    # -------------------------
+    # 导出 Excel
+    # -------------------------
+    df_scores = []
+    for c, q_list in scores.items():
+        for i, q in enumerate(questions[c]):
+            df_scores.append({"体质类型": c, "题目": q, "分数": q_list[i]})
+    df_scores = pd.DataFrame(df_scores)
+
+    # 百分比单独表格
+    df_percent = pd.DataFrame(list(percentages.items()), columns=["体质类型", "百分比"])
+
+    with pd.ExcelWriter("records/record.xlsx") as writer:
+        df_scores.to_excel(writer, index=False, sheet_name="原始打分")
+        df_percent.to_excel(writer, index=False, sheet_name="体质百分比")
+    st.success("测试记录已导出为 Excel！")
+    st.download_button("下载 Excel 文件", "records/record.xlsx", "record.xlsx")
