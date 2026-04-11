@@ -4,7 +4,6 @@ import streamlit as st
 import matplotlib.pyplot as plt
 import numpy as np
 from io import BytesIO
-from reportlab.pdfgen import canvas
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.utils import ImageReader
 
