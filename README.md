@@ -88,7 +88,7 @@ Data is not stored locally. All data is fetched from WRDS.
 
 # 📦 Project Structure
 
-project/
-├── app.py
-├── README.md
-└── notebook.ipynb
+/project  
+│── app.py  
+│── README.md  
+│── notebook.ipynb (WRDS analysis process)
