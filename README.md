@@ -1,29 +1,57 @@
-# 📊 Tech Stock Decision Assistant
+# 📊 WRDS Tech Stock Analyzer
 
 ## 1. Objective
-This project aims to help retail investors compare major tech stocks and make better investment decisions based on data.
+
+This project aims to help retail investors evaluate major tech stocks using **data-driven financial analysis**.
+
+It answers the question:
+
+**Which tech stock provides the best balance of return and risk?**
+
+---
 
 ## 2. Target Users
-- Beginner investors  
-- Business students  
-- Individuals comparing tech companies (AAPL, MSFT, GOOGL, etc.)
 
-## 3. Features
-- 📈 Stock price trend visualization  
-- 📊 Financial metrics comparison  
-- 🧮 Investment scoring system (growth, profitability, risk)  
-- 👤 User preference (Conservative / Balanced / Aggressive)  
+- Beginner investors  
+- Business and finance students  
+- Users comparing large tech companies  
+
+---
+
+## 3. Data Sources
+
+### Primary Source (Academic)
+- WRDS (Wharton Research Data Services)
+- CRSP Database
+- Data accessed: April 2026
+
+### Secondary Source
+- Local fallback dataset (CSV)
+
+---
+
+## 4. Methodology
+
+The project uses financial metrics commonly applied in academic research:
+
+- **Annualized Return**
+- **Volatility (Risk)**
+- **Sharpe Ratio (Risk-adjusted return)**
+
+A ranking-based scoring model is used to generate investment recommendations.
+
+---
+
+## 5. Features
+
+- 📊 WRDS-based financial analysis  
+- 🔄 Real-time WRDS connection (if available)  
+- 🛟 Automatic fallback to CSV data  
+- 👤 Investor profile (Conservative / Balanced / Aggressive)  
+- 📈 Interactive visualization (Plotly)  
 - 💡 Automated investment recommendation  
 
-## 4. Data Source
-- Yahoo Finance (via yfinance)  
-- Data retrieved in April 2026  
-
-## 5. Methodology
-- CAGR (Compound Annual Growth Rate) for growth  
-- ROE & Net Margin for profitability  
-- Debt-to-Equity for risk  
-- Ranking-based scoring model  
+---
 
 ## 6. How to Run
 
