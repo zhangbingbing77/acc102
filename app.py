@@ -1,120 +1,107 @@
 import streamlit as st
+import wrds
 import pandas as pd
 import plotly.express as px
 
 # ----------------------
-# Page Config
+# Page config
 # ----------------------
 st.set_page_config(page_title="WRDS Stock Analyzer", layout="wide")
 
-st.title("📊 WRDS Tech Stock Analyzer")
-st.markdown("Risk-adjusted stock analysis using WRDS CRSP dataset.")
+st.title("📊 WRDS Live Stock Analyzer")
+st.markdown("On-demand financial analysis using WRDS CRSP dataset.")
 
 # ----------------------
-# Sidebar
+# Cache WRDS connection (VERY IMPORTANT)
 # ----------------------
-st.sidebar.header("Investor Settings")
+@st.cache_resource
+def connect_wrds():
+    return wrds.Connection()
 
-profile = st.sidebar.selectbox(
-    "Investor Profile",
-    ["Conservative", "Balanced", "Aggressive"]
+db = connect_wrds()
+
+# ----------------------
+# User input (on-demand request)
+# ----------------------
+st.sidebar.header("Data Query Settings")
+
+permno_dict = {
+    "AAPL": 14593,
+    "MSFT": 10107,
+    "GOOGL": 84788
+}
+
+selected_company = st.sidebar.selectbox(
+    "Select Company",
+    list(permno_dict.keys())
 )
 
-# ----------------------
-# Load Data (IMPORTANT)
-# ----------------------
-df = pd.read_csv("wrds_results.csv")
+start_date = st.sidebar.date_input("Start Date", pd.to_datetime("2023-01-01"))
 
 # ----------------------
-# Data Check
+# Fetch data ONLY when requested
 # ----------------------
-if df is None or df.empty:
-    st.error("Data not found. Please run notebook first to generate wrds_results.csv")
-    st.stop()
+if st.sidebar.button("Load WRDS Data"):
 
-# ----------------------
-# Scoring System
-# ----------------------
-df["return_score"] = df["Return"].rank(pct=True)
-df["risk_score"] = 1 - df["Volatility"].rank(pct=True)
-df["sharpe_score"] = df["Sharpe"].rank(pct=True)
+    permno = permno_dict[selected_company]
 
-if profile == "Conservative":
-    w1, w2, w3 = 0.2, 0.5, 0.3
-elif profile == "Balanced":
-    w1, w2, w3 = 0.3, 0.3, 0.4
-else:
-    w1, w2, w3 = 0.5, 0.2, 0.3
+    query = f"""
+    SELECT date, ret
+    FROM crsp.dsf
+    WHERE permno = {permno}
+    AND date >= '{start_date}'
+    ORDER BY date
+    LIMIT 1000
+    """
 
-df["total_score"] = (
-    w1 * df["return_score"] +
-    w2 * df["risk_score"] +
-    w3 * df["sharpe_score"]
-)
+    df = db.raw_sql(query)
 
-# ----------------------
-# Best Stock
-# ----------------------
-best_stock = df.sort_values("total_score", ascending=False).iloc[0]["Company"]
+    # ----------------------
+    # Data cleaning
+    # ----------------------
+    df["ret"] = pd.to_numeric(df["ret"], errors="coerce")
+    df = df.dropna()
 
-# ----------------------
-# KPI Section
-# ----------------------
-st.subheader("📌 Key Insights")
+    # ----------------------
+    # Metrics
+    # ----------------------
+    ann_return = df["ret"].mean() * 252
+    volatility = df["ret"].std() * (252 ** 0.5)
+    sharpe = ann_return / volatility if volatility != 0 else 0
 
-col1, col2, col3 = st.columns(3)
+    # ----------------------
+    # Display KPIs
+    # ----------------------
+    st.subheader(f"📌 Results for {selected_company}")
 
-col1.metric("Best Overall Stock", best_stock)
-col2.metric("Highest Return", df.sort_values("Return", ascending=False).iloc[0]["Company"])
-col3.metric("Lowest Risk", df.sort_values("Volatility").iloc[0]["Company"])
+    col1, col2, col3 = st.columns(3)
 
-# ----------------------
-# Table
-# ----------------------
-st.subheader("📋 Financial Metrics (WRDS CRSP)")
+    col1.metric("Annual Return", f"{ann_return:.2%}")
+    col2.metric("Volatility", f"{volatility:.2%}")
+    col3.metric("Sharpe Ratio", f"{sharpe:.2f}")
 
-st.dataframe(
-    df.set_index("Company").style.format({
-        "Return": "{:.2%}",
-        "Volatility": "{:.2%}",
-        "Sharpe": "{:.2f}",
-        "total_score": "{:.2f}"
-    }),
-    use_container_width=True
-)
+    # ----------------------
+    # Chart
+    # ----------------------
+    st.subheader("📈 Daily Returns")
 
-# ----------------------
-# Visualization
-# ----------------------
-st.subheader("📊 Sharpe Ratio Comparison")
+    fig = px.line(df, x="date", y="ret", title="Daily Returns Over Time")
+    st.plotly_chart(fig, use_container_width=True)
 
-fig = px.bar(
-    df,
-    x="Company",
-    y="Sharpe",
-    color="Company",
-    text="Sharpe"
-)
+    # ----------------------
+    # Insight
+    # ----------------------
+    st.success(f"""
+    Based on WRDS CRSP data:
 
-st.plotly_chart(fig, use_container_width=True)
+    {selected_company} shows:
+    - Risk-adjusted performance (Sharpe): {sharpe:.2f}
+    - Moderate volatility: {volatility:.2%}
 
-# ----------------------
-# Recommendation
-# ----------------------
-st.subheader("💡 Investment Recommendation")
-
-st.success(f"""
-Based on WRDS CRSP data analysis:
-
-**{best_stock}** is the optimal investment choice.
-
-This recommendation is based on:
-- Higher risk-adjusted return (Sharpe ratio)
-- Balanced volatility
-- Strong overall performance score
-""")
+    This indicates a balance between risk and return.
+    """)
 
 # ----------------------
 # Footer
 # ----------------------
-st.caption("Data Source: WRDS CRSP | Educational Use Only")
+st.caption("Data Source: WRDS CRSP | On-demand query model | Educational use only")
