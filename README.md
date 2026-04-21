@@ -86,11 +86,8 @@ Step 3: Use the app
 
 Data is not stored locally. All data is fetched from WRDS.
 
----
-# 📦 Project Structure
-
+---# 📦 Project Structure
 project/
 ├── app.py
 ├── README.md
 └── notebook.ipynb (WRDS analysis process)
-
