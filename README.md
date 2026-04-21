@@ -1,19 +1,32 @@
-# ACC102 Mini Assignment - Track4
-## Tech Giants Financial Comparison Tool
-This is an interactive financial analysis web tool developed with Streamlit.
-It compares key financial performance indicators of three major technology companies: AAPL, MSFT, GOOGL.
+# 📊 Tech Stock Decision Assistant
 
-## Data Source
-Financial data is retrieved from Yahoo Finance via yfinance library.
-Indicators include Market Cap, P/E Ratio, ROE, Gross Margin, Net Margin, Debt to Equity.
-Analysis period: 2018 - 2023.
+## 1. Objective
+This project aims to help retail investors compare major tech stocks and make better investment decisions based on data.
 
-## Environment Requirements
-- Python 3.9+
-- Required packages: streamlit, yfinance, pandas, plotly
+## 2. Target Users
+- Beginner investors  
+- Business students  
+- Individuals comparing tech companies (AAPL, MSFT, GOOGL, etc.)
 
-## How to run the application
-1. Download all project files locally
-2. Install dependencies:
+## 3. Features
+- 📈 Stock price trend visualization  
+- 📊 Financial metrics comparison  
+- 🧮 Investment scoring system (growth, profitability, risk)  
+- 👤 User preference (Conservative / Balanced / Aggressive)  
+- 💡 Automated investment recommendation  
+
+## 4. Data Source
+- Yahoo Finance (via yfinance)  
+- Data retrieved in April 2026  
+
+## 5. Methodology
+- CAGR (Compound Annual Growth Rate) for growth  
+- ROE & Net Margin for profitability  
+- Debt-to-Equity for risk  
+- Ranking-based scoring model  
+
+## 6. How to Run
+
 ```bash
 pip install -r requirements.txt
+streamlit run app.py
