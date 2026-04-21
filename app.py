@@ -3,11 +3,18 @@ import pandas as pd
 import streamlit as st
 import plotly.graph_objects as go
 import plotly.express as px
+import os
 
 # ======================
 # 1. 读取 CSV
 # ======================
 data_path = "data/stock_data_sample.csv"
+
+if not os.path.exists(data_path):
+    st.error(f"CSV file not found at {data_path}. Please make sure 'stock_data_sample.csv' is in the data/ folder.")
+    st.stop()
+
+# 读取数据并解析日期
 data = pd.read_csv(data_path, parse_dates=['DlyCalDt'])
 
 # 重命名列便于分析
@@ -49,13 +56,23 @@ selected_tickers = st.multiselect("Select one or more stocks:", tickers, default
 # 选择时间范围
 min_date = data['Date'].min()
 max_date = data['Date'].max()
-start_date, end_date = st.date_input("Select date range:", [min_date, max_date],
-                                     min_value=min_date, max_value=max_date)
+start_date, end_date = st.date_input(
+    "Select date range:",
+    [min_date, max_date],
+    min_value=min_date,
+    max_value=max_date
+)
 
 # 过滤数据
-filtered_data = data[(data['Ticker'].isin(selected_tickers)) &
-                     (data['Date'] >= pd.to_datetime(start_date)) &
-                     (data['Date'] <= pd.to_datetime(end_date))]
+filtered_data = data[
+    (data['Ticker'].isin(selected_tickers)) &
+    (data['Date'] >= pd.to_datetime(start_date)) &
+    (data['Date'] <= pd.to_datetime(end_date))
+]
+
+if filtered_data.empty:
+    st.warning("No data available for the selected stocks and date range.")
+    st.stop()
 
 # ======================
 # 4. 绘图：收盘价 + 移动均线
