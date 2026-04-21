@@ -1,128 +1,218 @@
-# app.py
 import streamlit as st
 import yfinance as yf
 import pandas as pd
+import numpy as np
 import plotly.express as px
 
-# 页面设置
-st.set_page_config(page_title="Tech Giants Financial Comparison", layout="wide")
+# ----------------------
+# Page config
+# ----------------------
+st.set_page_config(page_title="Tech Stock Decision Assistant", layout="wide")
 
-# 标题
-st.markdown("<h1 style='text-align: center; color: #1E90FF;'>Tech Giants Financial Comparison Tool</h1>", unsafe_allow_html=True)
-st.markdown("<p style='text-align: center;'>Compare financial indicators of top global tech companies. Ideal for investors or business students.</p>", unsafe_allow_html=True)
+st.title("📊 Tech Stock Decision Assistant")
+st.markdown("ساعد retail investors compare **growth, profitability, and risk** to make better investment decisions.")
 
 # ----------------------
-# Sidebar input
+# Sidebar
 # ----------------------
 st.sidebar.header("Settings")
-company_options = ["AAPL", "MSFT", "GOOGL"]
-selected_companies = st.sidebar.multiselect("Select Companies", company_options, default=company_options)
 
-years_range = st.sidebar.slider("Select Year Range", 2018, 2023, (2020, 2023))
+company_options = ["AAPL", "MSFT", "GOOGL", "AMZN", "META", "NVDA"]
+selected_companies = st.sidebar.multiselect(
+    "Select Companies", company_options, default=["AAPL", "MSFT", "GOOGL"]
+)
 
-metric_options = ["Market Cap", "P/E", "ROE", "Gross Margin", "Net Margin", "Debt to Equity"]
-selected_metric = st.sidebar.selectbox("Select Financial Metric", metric_options)
+years_range = st.sidebar.slider("Select Year Range", 2018, 2024, (2020, 2024))
+
+risk_profile = st.sidebar.selectbox(
+    "Investor Profile",
+    ["Conservative", "Balanced", "Aggressive"]
+)
 
 # ----------------------
 # Data fetching
 # ----------------------
-@st.cache_data
-def get_financial_data(ticker):
+@st.cache_data(ttl=3600)
+def get_data(ticker, start_year):
     stock = yf.Ticker(ticker)
-    hist = stock.history(period="max")
+    hist = stock.history(start=f"{start_year}-01-01")
     info = stock.info
-    metrics = {
+
+    return hist, {
         "Market Cap": info.get("marketCap"),
         "P/E": info.get("trailingPE"),
         "ROE": info.get("returnOnEquity"),
-        "Gross Margin": info.get("grossMargins"),
         "Net Margin": info.get("profitMargins"),
-        "Debt to Equity": info.get("debtToEquity")
+        "Debt to Equity": info.get("debtToEquity"),
     }
-    return hist, metrics
 
+# ----------------------
+# Load data
+# ----------------------
 data_dict = {}
-metrics_df = pd.DataFrame(columns=["Company"] + metric_options)
+rows = []
 
-for company in selected_companies:
-    hist, metrics = get_financial_data(company)
-    data_dict[company] = hist
-    row = {"Company": company}
-    row.update(metrics)
-    metrics_df = pd.concat([metrics_df, pd.DataFrame([row])], ignore_index=True)
-
-# ----------------------
-# Stock price trend
-# ----------------------
-st.markdown("<h2 style='text-align:center; color: #1E90FF;'>Stock Price Trend</h2>", unsafe_allow_html=True)
-if selected_companies:
-    fig = px.line()
+with st.spinner("Fetching financial data..."):
     for company in selected_companies:
-        df = data_dict[company]
-        df_filtered = df[(df.index.year >= years_range[0]) & (df.index.year <= years_range[1])]
-        fig.add_scatter(x=df_filtered.index, y=df_filtered["Close"], mode="lines", name=company)
-    fig.update_layout(title="Stock Price Trend", xaxis_title="Date", yaxis_title="Close Price (USD)", legend_title="Company", template="plotly_white")
-    st.plotly_chart(fig, use_container_width=True)
+        hist, metrics = get_data(company, years_range[0])
+        data_dict[company] = hist
+
+        row = {"Company": company}
+        row.update(metrics)
+        rows.append(row)
+
+metrics_df = pd.DataFrame(rows)
 
 # ----------------------
-# Financial metric comparison
+# Data cleaning
 # ----------------------
-st.markdown(f"<h2 style='text-align:center; color: #1E90FF;'>{selected_metric} Comparison</h2>", unsafe_allow_html=True)
-if not metrics_df.empty:
-    fig2 = px.bar(metrics_df, x="Company", y=selected_metric, text=selected_metric, color="Company", color_discrete_sequence=px.colors.qualitative.Set2)
-    fig2.update_layout(title=f"{selected_metric} Comparison", yaxis_title=selected_metric, template="plotly_white")
-    st.plotly_chart(fig2, use_container_width=True)
+for col in ["P/E", "ROE", "Net Margin", "Debt to Equity"]:
+    metrics_df[col] = pd.to_numeric(metrics_df[col], errors="coerce")
+
+# ----------------------
+# Calculate CAGR & Volatility
+# ----------------------
+cagr_list = []
+volatility_list = []
+
+filtered_data = {}
+
+for company, df in data_dict.items():
+    df_filtered = df[
+        (df.index.year >= years_range[0]) &
+        (df.index.year <= years_range[1])
+    ]
+
+    filtered_data[company] = df_filtered
+
+    if len(df_filtered) < 2:
+        cagr_list.append(np.nan)
+        volatility_list.append(np.nan)
+        continue
+
+    start_price = df_filtered["Close"].iloc[0]
+    end_price = df_filtered["Close"].iloc[-1]
+
+    years = years_range[1] - years_range[0]
+    if start_price > 0 and years > 0:
+        cagr = (end_price / start_price) ** (1 / years) - 1
+    else:
+        cagr = np.nan
+
+    returns = df_filtered["Close"].pct_change()
+    volatility = returns.std()
+
+    cagr_list.append(cagr)
+    volatility_list.append(volatility)
+
+metrics_df["CAGR"] = cagr_list
+metrics_df["Volatility"] = volatility_list
+
+# ----------------------
+# Scoring system
+# ----------------------
+metrics_df["growth_score"] = metrics_df["CAGR"].rank(pct=True)
+
+metrics_df["profit_score"] = (
+    metrics_df["ROE"].rank(pct=True) +
+    metrics_df["Net Margin"].rank(pct=True)
+) / 2
+
+metrics_df["risk_score"] = (
+    1 - metrics_df["Debt to Equity"].rank(pct=True)
+)
+
+# Investor preference weights
+if risk_profile == "Conservative":
+    w_growth, w_profit, w_risk = 0.2, 0.3, 0.5
+elif risk_profile == "Balanced":
+    w_growth, w_profit, w_risk = 0.4, 0.3, 0.3
+else:
+    w_growth, w_profit, w_risk = 0.6, 0.2, 0.2
+
+metrics_df["total_score"] = (
+    w_growth * metrics_df["growth_score"] +
+    w_profit * metrics_df["profit_score"] +
+    w_risk * metrics_df["risk_score"]
+)
+
+# ----------------------
+# Identify top companies
+# ----------------------
+top_company = metrics_df.sort_values("total_score", ascending=False).iloc[0]["Company"]
+top_growth = metrics_df.sort_values("CAGR", ascending=False).iloc[0]["Company"]
+top_profit = metrics_df.sort_values("profit_score", ascending=False).iloc[0]["Company"]
+lowest_risk = metrics_df.sort_values("risk_score", ascending=False).iloc[0]["Company"]
+
+# ----------------------
+# KPI cards
+# ----------------------
+st.subheader("🏆 Key Insights")
+
+col1, col2, col3, col4 = st.columns(4)
+col1.metric("Best Overall", top_company)
+col2.metric("Best Growth", top_growth)
+col3.metric("Best Profitability", top_profit)
+col4.metric("Lowest Risk", lowest_risk)
+
+# ----------------------
+# Price trend
+# ----------------------
+st.subheader("📈 Stock Price Trend")
+
+fig = px.line()
+
+for company, df in filtered_data.items():
+    if not df.empty:
+        fig.add_scatter(x=df.index, y=df["Close"], mode="lines", name=company)
+
+fig.update_layout(template="plotly_white")
+st.plotly_chart(fig, use_container_width=True)
+
+# ----------------------
+# Score comparison
+# ----------------------
+st.subheader("📊 Investment Score Comparison")
+
+fig2 = px.bar(
+    metrics_df,
+    x="Company",
+    y="total_score",
+    color="Company",
+    text="total_score"
+)
+
+st.plotly_chart(fig2, use_container_width=True)
 
 # ----------------------
 # Data table
 # ----------------------
-st.markdown("<h2 style='text-align:center; color: #1E90FF;'>Financial Metrics Table</h2>", unsafe_allow_html=True)
-st.dataframe(metrics_df.set_index("Company"), use_container_width=True)
+st.subheader("📋 Financial Metrics")
+
+st.dataframe(
+    metrics_df.set_index("Company").style.format({
+        "CAGR": "{:.2%}",
+        "ROE": "{:.2%}",
+        "Net Margin": "{:.2%}",
+        "Volatility": "{:.4f}",
+        "total_score": "{:.2f}"
+    }),
+    use_container_width=True
+)
 
 # ----------------------
-# Automated financial analysis with cards
+# Final recommendation
 # ----------------------
-st.markdown("<h2 style='text-align:center; color: #1E90FF;'>Automated Financial Analysis</h2>", unsafe_allow_html=True)
-if not metrics_df.empty:
-    try:
-        # Numeric conversion
-        metrics_df[selected_metric] = pd.to_numeric(metrics_df[selected_metric], errors='coerce')
-        metrics_df["Net Margin"] = pd.to_numeric(metrics_df["Net Margin"], errors='coerce')
-        metrics_df["ROE"] = pd.to_numeric(metrics_df["ROE"], errors='coerce')
-        metrics_df["Debt to Equity"] = pd.to_numeric(metrics_df["Debt to Equity"], errors='coerce')
-        metrics_df["P/E"] = pd.to_numeric(metrics_df["P/E"], errors='coerce')
+st.subheader("💡 Investment Recommendation")
 
-        # Profitability card
-        top_profit_idx = metrics_df[["Net Margin","ROE"]].mean(axis=1).idxmax()
-        top_profit_company = metrics_df.loc[top_profit_idx,"Company"]
-        st.markdown(f"<div style='border:1px solid #1E90FF; padding:10px; border-radius:5px; background-color:#F0F8FF;'>"
-                    f"<h4>Profitability Analysis</h4>"
-                    f"<p>Based on <b>Net Margin</b> and <b>ROE</b>, <b>{top_profit_company}</b> demonstrates the strongest profitability among the selected companies, indicating efficient management and good cost control.</p>"
-                    f"</div>", unsafe_allow_html=True)
+st.success(f"""
+Based on your selected profile (**{risk_profile}**),  
+**{top_company}** is the best investment choice.
 
-        # Growth card
-        price_start = {}
-        price_end = {}
-        for company in selected_companies:
-            df = data_dict[company]
-            df_filtered = df[(df.index.year >= years_range[0]) & (df.index.year <= years_range[1])]
-            price_start[company] = df_filtered["Close"].iloc[0]
-            price_end[company] = df_filtered["Close"].iloc[-1]
-        growth_rate = {c: (price_end[c]-price_start[c])/price_start[c]*100 for c in selected_companies}
-        top_growth = max(growth_rate, key=growth_rate.get)
-        st.markdown(f"<div style='border:1px solid #32CD32; padding:10px; border-radius:5px; background-color:#F0FFF0;'>"
-                    f"<h4>Growth Analysis</h4>"
-                    f"<p>Considering stock price trend over the selected years, <b>{top_growth}</b> shows the highest growth ({growth_rate[top_growth]:.2f}%), reflecting strong market performance and investor confidence.</p>"
-                    f"</div>", unsafe_allow_html=True)
+### Why?
+- Strong growth performance (CAGR)
+- Solid profitability (ROE & Net Margin)
+- Acceptable risk level
 
-        # Risk card
-        risk_score = metrics_df["Debt to Equity"] + metrics_df["P/E"]
-        safest_idx = risk_score.idxmin()
-        safest_company = metrics_df.loc[safest_idx, "Company"]
-        st.markdown(f"<div style='border:1px solid #FF4500; padding:10px; border-radius:5px; background-color:#FFF5F0;'>"
-                    f"<h4>Risk Analysis</h4>"
-                    f"<p>With relatively low <b>Debt to Equity</b> and <b>P/E</b>, <b>{safest_company}</b> presents the lowest financial risk compared to peers, making it more resilient to market fluctuations.</p>"
-                    f"</div>", unsafe_allow_html=True)
-
-    except Exception as e:
-        st.write("Error generating analysis:", e)
+This makes it the most balanced option among selected companies.
+""")
