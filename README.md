@@ -8,8 +8,8 @@ Xi’an Jiaotong-Liverpool University
 ---
 
 ## 👤 Student Information
-- Name: YOUR NAME  
-- Student ID: YOUR ID  
+- Name: Bingbing Zhang
+- Student ID: 2469540 
 - Track: Track 4 – Interactive Data Analysis Tool  
 - Project Type: Streamlit Data Product  
 
