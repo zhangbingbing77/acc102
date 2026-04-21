@@ -1,4 +1,17 @@
-streamlit
-yfinance
-pandas
-plotly
+# requirements.txt
+# Python 3.10+ recommended
+
+# Data processing
+pandas==2.1.0
+
+# Web application framework
+streamlit==1.29.0
+
+# Interactive plotting
+plotly==5.17.0
+
+# Optional: date parsing and handling (already in pandas, but can include for safety)
+python-dateutil==2.8.2
+
+# Optional: numpy is usually required by pandas/plotly
+numpy==1.26.0
