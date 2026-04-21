@@ -95,6 +95,3 @@ Data is not stored locally. All data is fetched from WRDS.
 │── README.md  
 │── notebook.ipynb (WRDS analysis process)
 
----
-
-# ✅ End of Report
