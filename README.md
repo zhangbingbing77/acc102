@@ -1,127 +1,100 @@
 # 📊 WRDS Live Stock Analyzer (Data Product Project)
 
-
 ## 👤 Student Information
-- Name: Bingbing Zhang
+- Name: Bingbing Zhang  
 - Student ID: 2469540 
-- Track: Track 4 – Interactive Data Analysis Tool  
-- Project Type: Streamlit Data Product  
+- Project Type: Streamlit Interactive Data Product  
+- Track 4 – Interactive Data Analysis Tool 
+---
+
+# 1. Problem Definition
+
+This project aims to analyze and compare the risk-adjusted performance of major technology stocks using historical market data from WRDS.
+
+The core problem is to identify which stock provides the best balance between return and risk based on empirical financial data.
+
+The motivation is to move beyond simple return comparison and focus on risk-adjusted investment performance.
 
 ---
 
-# 🎯 1. Project Overview
+# 2. Target Users / Audience
 
-This project is an interactive financial data analysis tool built using Python and Streamlit.
+The target users of this project include:
 
-It allows users to dynamically retrieve and analyze stock performance data from the WRDS CRSP database.
+- University students studying finance, economics, or data analytics  
+- Beginner investors interested in quantitative investment analysis  
+- Users who want to understand risk-return trade-offs in financial markets  
 
-The tool focuses on evaluating risk-adjusted returns of major technology stocks using financial metrics such as:
-
-- Annualized Return  
-- Volatility  
-- Sharpe Ratio  
+The tool is designed for educational and decision-support purposes rather than professional trading.
 
 ---
 
-# ❓ 2. Research Question
+# 3. Dataset Description
 
-Which technology stock provides the best risk-adjusted return based on WRDS CRSP historical data?
+Data Source: WRDS (CRSP Daily Stock File)  
+Access Method: Python WRDS API (on-demand SQL query)  
+Data Retrieval Date: April 2026  
 
----
+Variables:
+- date: trading date  
+- ret: daily stock return  
+- permno: stock identifier  
 
-# 📊 3. Data Source
-
-- Source: WRDS (CRSP Daily Stock File)
-- Type: Financial market data (daily returns)
-- Access Method: Python WRDS API (on-demand query)
-- Data Retrieval Date: April 2026
-
----
-
-# ⚙️ 4. Data Pipeline
-
-This project follows a two-stage workflow:
-
-### Step 1: Data Collection
-- Data is retrieved directly from WRDS CRSP database
-- Users select a stock and time range in the Streamlit interface
-- Data is fetched on demand (not pre-stored)
-
-### Step 2: Data Processing
-- Calculation of:
-  - Annualized Return
-  - Volatility
-  - Sharpe Ratio
-- Results displayed interactively in Streamlit
+All data is retrieved dynamically upon request. No pre-stored datasets are used.
 
 ---
 
-# 🧠 5. Methodology
+# 4. Methodology
 
-The following financial metrics are used:
+Step 1: Data is retrieved from WRDS CRSP database using SQL queries.  
+Step 2: Data is cleaned and converted into numeric format.  
+Step 3: Financial indicators are calculated:
 
-### Annualized Return
-Measures long-term growth of the stock.
+- Annualized Return = mean(daily return) × 252  
+- Volatility = standard deviation × √252  
+- Sharpe Ratio = Return / Volatility  
 
-### Volatility
-Measures the risk level based on return fluctuations.
-
-### Sharpe Ratio
-Measures risk-adjusted performance:
-
-Sharpe = Return / Volatility
-
-A higher Sharpe Ratio indicates better performance per unit of risk.
+Step 4: Stocks are compared based on risk-adjusted performance.
 
 ---
 
-# 🛠️ 6. Tools & Technologies
+# 5. Key Insights
 
-- Python
-- Streamlit
-- WRDS (CRSP Database)
-- Pandas
-- Plotly
+The analysis shows that stocks differ significantly in both return and risk levels.
 
----
+- High return stocks often come with higher volatility  
+- Stable stocks may offer lower returns  
+- Sharpe Ratio provides a balanced performance measure  
 
-# 📈 7. Features
-
-- Interactive stock selection
-- On-demand WRDS data retrieval
-- Real-time financial metric calculation
-- Visualized return trends
-- Risk-return analysis dashboard
+Overall, the best stock is not the one with highest return, but highest risk-adjusted efficiency.
 
 ---
 
-# ⚠️ 8. Important Notes (Compliance)
+# 6. How to Run the Project
 
-- No manually created or hardcoded financial datasets are used.
-- All data is retrieved directly from WRDS upon user request.
-- The application does not rely on external CSV or Excel files.
-- Data is not pre-stored to ensure compliance with Track 4 requirements.
+Step 1: Install dependencies  
+pip install streamlit wrds pandas plotly  
 
----
+Step 2: Run the app  
+streamlit run app.py  
 
-# 🚧 9. Limitations
+Step 3: Use the app  
+- Select stock from sidebar  
+- Choose time range  
+- Click load data  
+- View charts and metrics  
 
-- Limited number of stocks available in the demo
-- Performance depends on WRDS server response time
-- Only historical data is considered (no real-time trading signals)
-- No macroeconomic variables included
-
----
-
-# 💡 10. Future Improvements
-
-- Expand stock universe
-- Add portfolio optimization module
-- Include macroeconomic indicators
-- Improve caching and performance optimization
+Data is not stored locally. All data is fetched from WRDS.
 
 ---
 
-# 📌 11. How to Run the Project
+# 📦 Project Structure
 
-1. Install dependencies:
+/project  
+│── app.py  
+│── README.md  
+│── notebook.ipynb (WRDS analysis process)
+
+---
+
+# ✅ End of Report
