@@ -1,10 +1,5 @@
 # 📊 WRDS Live Stock Analyzer (Data Product Project)
 
-## Course Information
-ACC102 Data Product  
-Xi’an Jiaotong-Liverpool University  
-2024–2025 Semester 2  
-
 ---
 
 ## 👤 Student Information
