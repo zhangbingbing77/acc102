@@ -1,28 +1,19 @@
 import streamlit as st
-import yfinance as yf
 import pandas as pd
 import numpy as np
 import plotly.express as px
 
-# ----------------------
-# Page config
-# ----------------------
-st.set_page_config(page_title="Tech Stock Decision Assistant", layout="wide")
+st.set_page_config(page_title="WRDS Tech Stock Analyzer", layout="wide")
 
-st.title("📊 Tech Stock Decision Assistant")
-st.markdown("ساعد retail investors compare **growth, profitability, and risk** to make better investment decisions.")
+st.title("📊 WRDS-Based Tech Stock Analyzer")
+st.markdown("Analyze tech stocks using **CRSP data from WRDS** with risk-adjusted metrics.")
 
 # ----------------------
 # Sidebar
 # ----------------------
 st.sidebar.header("Settings")
 
-company_options = ["AAPL", "MSFT", "GOOGL", "AMZN", "META", "NVDA"]
-selected_companies = st.sidebar.multiselect(
-    "Select Companies", company_options, default=["AAPL", "MSFT", "GOOGL"]
-)
-
-years_range = st.sidebar.slider("Select Year Range", 2018, 2024, (2020, 2024))
+use_wrds = st.sidebar.checkbox("Use Live WRDS Data", value=True)
 
 risk_profile = st.sidebar.selectbox(
     "Investor Profile",
@@ -30,189 +21,134 @@ risk_profile = st.sidebar.selectbox(
 )
 
 # ----------------------
-# Data fetching
+# WRDS Data Function
 # ----------------------
 @st.cache_data(ttl=3600)
-def get_data(ticker, start_year):
-    stock = yf.Ticker(ticker)
-    hist = stock.history(start=f"{start_year}-01-01")
-    info = stock.info
+def load_wrds_data():
+    try:
+        import wrds
+        db = wrds.Connection()
 
-    return hist, {
-        "Market Cap": info.get("marketCap"),
-        "P/E": info.get("trailingPE"),
-        "ROE": info.get("returnOnEquity"),
-        "Net Margin": info.get("profitMargins"),
-        "Debt to Equity": info.get("debtToEquity"),
-    }
+        query = """
+        SELECT date, permno, ret
+        FROM crsp.dsf
+        WHERE permno IN (14593, 10107, 84788)
+        AND date >= '2020-01-01'
+        """
 
-# ----------------------
-# Load data
-# ----------------------
-data_dict = {}
-rows = []
+        df = db.raw_sql(query)
 
-with st.spinner("Fetching financial data..."):
-    for company in selected_companies:
-        hist, metrics = get_data(company, years_range[0])
-        data_dict[company] = hist
+        df['ret'] = pd.to_numeric(df['ret'], errors='coerce')
 
-        row = {"Company": company}
-        row.update(metrics)
-        rows.append(row)
+        results = []
 
-metrics_df = pd.DataFrame(rows)
+        for permno in df['permno'].unique():
+            sub = df[df['permno'] == permno]
 
-# ----------------------
-# Data cleaning
-# ----------------------
-for col in ["P/E", "ROE", "Net Margin", "Debt to Equity"]:
-    metrics_df[col] = pd.to_numeric(metrics_df[col], errors="coerce")
+            ann_return = sub['ret'].mean() * 252
+            volatility = sub['ret'].std() * np.sqrt(252)
 
-# ----------------------
-# Calculate CAGR & Volatility
-# ----------------------
-cagr_list = []
-volatility_list = []
+            sharpe = ann_return / volatility if volatility != 0 else np.nan
 
-filtered_data = {}
+            results.append({
+                "permno": permno,
+                "Return": ann_return,
+                "Volatility": volatility,
+                "Sharpe": sharpe
+            })
 
-for company, df in data_dict.items():
-    df_filtered = df[
-        (df.index.year >= years_range[0]) &
-        (df.index.year <= years_range[1])
-    ]
+        result_df = pd.DataFrame(results)
 
-    filtered_data[company] = df_filtered
+        mapping = {
+            14593: "AAPL",
+            10107: "MSFT",
+            84788: "GOOGL"
+        }
 
-    if len(df_filtered) < 2:
-        cagr_list.append(np.nan)
-        volatility_list.append(np.nan)
-        continue
+        result_df["Company"] = result_df["permno"].map(mapping)
 
-    start_price = df_filtered["Close"].iloc[0]
-    end_price = df_filtered["Close"].iloc[-1]
+        return result_df
 
-    years = years_range[1] - years_range[0]
-    if start_price > 0 and years > 0:
-        cagr = (end_price / start_price) ** (1 / years) - 1
-    else:
-        cagr = np.nan
-
-    returns = df_filtered["Close"].pct_change()
-    volatility = returns.std()
-
-    cagr_list.append(cagr)
-    volatility_list.append(volatility)
-
-metrics_df["CAGR"] = cagr_list
-metrics_df["Volatility"] = volatility_list
+    except:
+        st.warning("WRDS connection failed. Using local fallback data.")
+        return pd.read_csv("wrds_results.csv")
 
 # ----------------------
-# Scoring system
+# Load Data
 # ----------------------
-metrics_df["growth_score"] = metrics_df["CAGR"].rank(pct=True)
-
-metrics_df["profit_score"] = (
-    metrics_df["ROE"].rank(pct=True) +
-    metrics_df["Net Margin"].rank(pct=True)
-) / 2
-
-metrics_df["risk_score"] = (
-    1 - metrics_df["Debt to Equity"].rank(pct=True)
-)
-
-# Investor preference weights
-if risk_profile == "Conservative":
-    w_growth, w_profit, w_risk = 0.2, 0.3, 0.5
-elif risk_profile == "Balanced":
-    w_growth, w_profit, w_risk = 0.4, 0.3, 0.3
+if use_wrds:
+    df = load_wrds_data()
 else:
-    w_growth, w_profit, w_risk = 0.6, 0.2, 0.2
+    df = pd.read_csv("wrds_results.csv")
 
-metrics_df["total_score"] = (
-    w_growth * metrics_df["growth_score"] +
-    w_profit * metrics_df["profit_score"] +
-    w_risk * metrics_df["risk_score"]
+# ----------------------
+# Scoring Model
+# ----------------------
+df["return_score"] = df["Return"].rank(pct=True)
+df["risk_score"] = 1 - df["Volatility"].rank(pct=True)
+df["sharpe_score"] = df["Sharpe"].rank(pct=True)
+
+if risk_profile == "Conservative":
+    w_return, w_risk, w_sharpe = 0.2, 0.5, 0.3
+elif risk_profile == "Balanced":
+    w_return, w_risk, w_sharpe = 0.3, 0.3, 0.4
+else:
+    w_return, w_risk, w_sharpe = 0.5, 0.2, 0.3
+
+df["total_score"] = (
+    w_return * df["return_score"] +
+    w_risk * df["risk_score"] +
+    w_sharpe * df["sharpe_score"]
 )
 
 # ----------------------
-# Identify top companies
+# KPI
 # ----------------------
-top_company = metrics_df.sort_values("total_score", ascending=False).iloc[0]["Company"]
-top_growth = metrics_df.sort_values("CAGR", ascending=False).iloc[0]["Company"]
-top_profit = metrics_df.sort_values("profit_score", ascending=False).iloc[0]["Company"]
-lowest_risk = metrics_df.sort_values("risk_score", ascending=False).iloc[0]["Company"]
+top_company = df.sort_values("total_score", ascending=False).iloc[0]["Company"]
 
-# ----------------------
-# KPI cards
-# ----------------------
-st.subheader("🏆 Key Insights")
+st.subheader("🏆 Investment Insight")
 
-col1, col2, col3, col4 = st.columns(4)
+col1, col2, col3 = st.columns(3)
+
 col1.metric("Best Overall", top_company)
-col2.metric("Best Growth", top_growth)
-col3.metric("Best Profitability", top_profit)
-col4.metric("Lowest Risk", lowest_risk)
+col2.metric("Highest Return", df.sort_values("Return", ascending=False).iloc[0]["Company"])
+col3.metric("Lowest Risk", df.sort_values("Volatility").iloc[0]["Company"])
 
 # ----------------------
-# Price trend
+# Table
 # ----------------------
-st.subheader("📈 Stock Price Trend")
-
-fig = px.line()
-
-for company, df in filtered_data.items():
-    if not df.empty:
-        fig.add_scatter(x=df.index, y=df["Close"], mode="lines", name=company)
-
-fig.update_layout(template="plotly_white")
-st.plotly_chart(fig, use_container_width=True)
-
-# ----------------------
-# Score comparison
-# ----------------------
-st.subheader("📊 Investment Score Comparison")
-
-fig2 = px.bar(
-    metrics_df,
-    x="Company",
-    y="total_score",
-    color="Company",
-    text="total_score"
-)
-
-st.plotly_chart(fig2, use_container_width=True)
-
-# ----------------------
-# Data table
-# ----------------------
-st.subheader("📋 Financial Metrics")
+st.subheader("📋 WRDS Metrics")
 
 st.dataframe(
-    metrics_df.set_index("Company").style.format({
-        "CAGR": "{:.2%}",
-        "ROE": "{:.2%}",
-        "Net Margin": "{:.2%}",
-        "Volatility": "{:.4f}",
+    df.set_index("Company").style.format({
+        "Return": "{:.2%}",
+        "Volatility": "{:.2%}",
+        "Sharpe": "{:.2f}",
         "total_score": "{:.2f}"
     }),
     use_container_width=True
 )
 
 # ----------------------
-# Final recommendation
+# Chart
 # ----------------------
-st.subheader("💡 Investment Recommendation")
+st.subheader("📊 Sharpe Ratio Comparison")
+
+fig = px.bar(df, x="Company", y="Sharpe", color="Company", text="Sharpe")
+st.plotly_chart(fig, use_container_width=True)
+
+# ----------------------
+# Recommendation
+# ----------------------
+st.subheader("💡 Final Recommendation")
 
 st.success(f"""
-Based on your selected profile (**{risk_profile}**),  
-**{top_company}** is the best investment choice.
+Based on WRDS CRSP data, **{top_company}** is the best investment choice.
 
-### Why?
-- Strong growth performance (CAGR)
-- Solid profitability (ROE & Net Margin)
-- Acceptable risk level
+This decision is based on:
+- Annualized return
+- Volatility (risk)
+- Sharpe ratio (risk-adjusted return)
 
-This makes it the most balanced option among selected companies.
+Sharpe ratio is widely used in financial research to evaluate investment performance.
 """)
