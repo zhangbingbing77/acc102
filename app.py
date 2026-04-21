@@ -1,123 +1,77 @@
 import streamlit as st
 import pandas as pd
-import numpy as np
 import plotly.express as px
 
-st.set_page_config(page_title="WRDS Tech Stock Analyzer", layout="wide")
+# ----------------------
+# Page Config
+# ----------------------
+st.set_page_config(page_title="WRDS Stock Analyzer", layout="wide")
 
-st.title("📊 WRDS-Based Tech Stock Analyzer")
-st.markdown("Analyze tech stocks using **CRSP data from WRDS** with risk-adjusted metrics.")
+st.title("📊 WRDS Tech Stock Analyzer")
+st.markdown("Risk-adjusted stock analysis using WRDS CRSP dataset.")
 
 # ----------------------
 # Sidebar
 # ----------------------
-st.sidebar.header("Settings")
+st.sidebar.header("Investor Settings")
 
-use_wrds = st.sidebar.checkbox("Use Live WRDS Data", value=True)
-
-risk_profile = st.sidebar.selectbox(
+profile = st.sidebar.selectbox(
     "Investor Profile",
     ["Conservative", "Balanced", "Aggressive"]
 )
 
 # ----------------------
-# WRDS Data Function
+# Load Data (IMPORTANT)
 # ----------------------
-@st.cache_data(ttl=3600)
-def load_wrds_data():
-    try:
-        import wrds
-        db = wrds.Connection()
-
-        query = """
-        SELECT date, permno, ret
-        FROM crsp.dsf
-        WHERE permno IN (14593, 10107, 84788)
-        AND date >= '2020-01-01'
-        """
-
-        df = db.raw_sql(query)
-
-        df['ret'] = pd.to_numeric(df['ret'], errors='coerce')
-
-        results = []
-
-        for permno in df['permno'].unique():
-            sub = df[df['permno'] == permno]
-
-            ann_return = sub['ret'].mean() * 252
-            volatility = sub['ret'].std() * np.sqrt(252)
-
-            sharpe = ann_return / volatility if volatility != 0 else np.nan
-
-            results.append({
-                "permno": permno,
-                "Return": ann_return,
-                "Volatility": volatility,
-                "Sharpe": sharpe
-            })
-
-        result_df = pd.DataFrame(results)
-
-        mapping = {
-            14593: "AAPL",
-            10107: "MSFT",
-            84788: "GOOGL"
-        }
-
-        result_df["Company"] = result_df["permno"].map(mapping)
-
-        return result_df
-
-    except:
-        st.warning("WRDS connection failed. Using local fallback data.")
-        return pd.read_csv("wrds_results.csv")
+df = pd.read_csv("wrds_results.csv")
 
 # ----------------------
-# Load Data
+# Data Check
 # ----------------------
-if use_wrds:
-    df = load_wrds_data()
-else:
-    df = pd.read_csv("wrds_results.csv")
+if df is None or df.empty:
+    st.error("Data not found. Please run notebook first to generate wrds_results.csv")
+    st.stop()
 
 # ----------------------
-# Scoring Model
+# Scoring System
 # ----------------------
 df["return_score"] = df["Return"].rank(pct=True)
 df["risk_score"] = 1 - df["Volatility"].rank(pct=True)
 df["sharpe_score"] = df["Sharpe"].rank(pct=True)
 
-if risk_profile == "Conservative":
-    w_return, w_risk, w_sharpe = 0.2, 0.5, 0.3
-elif risk_profile == "Balanced":
-    w_return, w_risk, w_sharpe = 0.3, 0.3, 0.4
+if profile == "Conservative":
+    w1, w2, w3 = 0.2, 0.5, 0.3
+elif profile == "Balanced":
+    w1, w2, w3 = 0.3, 0.3, 0.4
 else:
-    w_return, w_risk, w_sharpe = 0.5, 0.2, 0.3
+    w1, w2, w3 = 0.5, 0.2, 0.3
 
 df["total_score"] = (
-    w_return * df["return_score"] +
-    w_risk * df["risk_score"] +
-    w_sharpe * df["sharpe_score"]
+    w1 * df["return_score"] +
+    w2 * df["risk_score"] +
+    w3 * df["sharpe_score"]
 )
 
 # ----------------------
-# KPI
+# Best Stock
 # ----------------------
-top_company = df.sort_values("total_score", ascending=False).iloc[0]["Company"]
+best_stock = df.sort_values("total_score", ascending=False).iloc[0]["Company"]
 
-st.subheader("🏆 Investment Insight")
+# ----------------------
+# KPI Section
+# ----------------------
+st.subheader("📌 Key Insights")
 
 col1, col2, col3 = st.columns(3)
 
-col1.metric("Best Overall", top_company)
+col1.metric("Best Overall Stock", best_stock)
 col2.metric("Highest Return", df.sort_values("Return", ascending=False).iloc[0]["Company"])
 col3.metric("Lowest Risk", df.sort_values("Volatility").iloc[0]["Company"])
 
 # ----------------------
 # Table
 # ----------------------
-st.subheader("📋 WRDS Metrics")
+st.subheader("📋 Financial Metrics (WRDS CRSP)")
 
 st.dataframe(
     df.set_index("Company").style.format({
@@ -130,25 +84,37 @@ st.dataframe(
 )
 
 # ----------------------
-# Chart
+# Visualization
 # ----------------------
 st.subheader("📊 Sharpe Ratio Comparison")
 
-fig = px.bar(df, x="Company", y="Sharpe", color="Company", text="Sharpe")
+fig = px.bar(
+    df,
+    x="Company",
+    y="Sharpe",
+    color="Company",
+    text="Sharpe"
+)
+
 st.plotly_chart(fig, use_container_width=True)
 
 # ----------------------
 # Recommendation
 # ----------------------
-st.subheader("💡 Final Recommendation")
+st.subheader("💡 Investment Recommendation")
 
 st.success(f"""
-Based on WRDS CRSP data, **{top_company}** is the best investment choice.
+Based on WRDS CRSP data analysis:
 
-This decision is based on:
-- Annualized return
-- Volatility (risk)
-- Sharpe ratio (risk-adjusted return)
+**{best_stock}** is the optimal investment choice.
 
-Sharpe ratio is widely used in financial research to evaluate investment performance.
+This recommendation is based on:
+- Higher risk-adjusted return (Sharpe ratio)
+- Balanced volatility
+- Strong overall performance score
 """)
+
+# ----------------------
+# Footer
+# ----------------------
+st.caption("Data Source: WRDS CRSP | Educational Use Only")
