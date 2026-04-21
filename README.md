@@ -1,6 +1,5 @@
 # 📊 WRDS Live Stock Analyzer (Data Product Project)
 
----
 
 ## 👤 Student Information
 - Name: Bingbing Zhang
