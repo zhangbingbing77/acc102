@@ -7,7 +7,7 @@ import plotly.express as px
 # ======================
 # 1. 读取 CSV
 # ======================
-data_path = '/Users/zhangbingbing/Desktop/acc102 track4/data/stock_data_sample.csv'
+data_path = "data/stock_data_sample.csv"
 data = pd.read_csv(data_path, parse_dates=['DlyCalDt'])
 
 # 重命名列便于分析
