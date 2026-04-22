@@ -28,12 +28,16 @@ This project is an interactive data analysis tool designed to explore historical
 - **Tickers:** AAPL, MSFT, AMZN, TSLA
 - **Data Retrieval Date:** Latest download on 2026-04-22
 - **Key Variables:**
-  - `date`: Trading date
-  - `ticker`: Stock symbol
-  - `prc`: Daily stock price
-  - `vol`: Trading volume
-  - `Adj Close`: Adjusted close price (computed)
-  - `Daily Return`: Percentage daily change (computed)
+  - PERMNO: Stock permanent identifier
+  - HdrCUSIP: Security identifier
+  - Ticker: Stock symbol
+  - PERMCO: Company identifier
+  - DlyCalDt: Trading date
+  - DlyPrc: Daily price
+  - DlyVol: Daily trading volume
+  - DlyLow: Daily low price
+  - DlyHigh: Daily high price
+  - DlyOpen: Daily opening price
 - **Data Size:** Full dataset uploaded (~<25MB merged)
 - **Note:** The CSV is complete, ensuring reproducibility; no external download required.
 
