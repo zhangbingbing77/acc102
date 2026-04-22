@@ -57,14 +57,13 @@ The app uses relative paths: data/stock_data.csv
 This project runs locally only.
 
 ## 5. Project Structure
-acc102/
-├── app.py                      
-├── ACC102_Financial_Analysis.ipynb  
-├── data/
-│   └── stock_data.csv          
-├── requirements.txt            
-├── README.md                   
-└── .gitignore
+The project files are organized as follows:
+- app.py: Main Streamlit interactive application
+- ACC102_Financial_Analysis.ipynb: Data cleaning and analysis notebook
+- data/stock_data.csv: Full WRDS stock dataset
+- requirements.txt: Python dependency packages
+- README.md: Project documentation
+- .gitignore: Git ignore configuration file
 
 ## 6. Features
 - Multi-stock selection (AAPL, MSFT, AMZN, TSLA)
