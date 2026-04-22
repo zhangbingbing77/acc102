@@ -4,7 +4,7 @@
 - **Name:** Bingbing Zhang 
 - **Student ID:** 2469540
 - **Module:** ACC102 
-- **Track4**:Interactive Data Analysis Tool 
+- **Track4**: Interactive Data Analysis Tool 
 
 ## 1. Project Title
 **Interactive Stock Analysis Tool (AAPL, MSFT, AMZN, TSLA)**
