@@ -1,110 +1,113 @@
 # app.py
-import pandas as pd
 import streamlit as st
-import plotly.graph_objects as go
-import plotly.express as px
-import os
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+import numpy as np
 
-# ======================
-# 1. 读取 CSV
-# ======================
-data_path = "data/stock_data_sample.csv"
+# ------------------------------
+# 1. 页面标题
+# ------------------------------
+st.set_page_config(page_title="Interactive Stock Analysis Tool", layout="wide")
+st.title("Interactive Stock Analysis Tool (AAPL, MSFT, AMZN, TSLA)")
 
-if not os.path.exists(data_path):
-    st.error(f"CSV file not found at {data_path}. Please make sure 'stock_data_sample.csv' is in the data/ folder.")
-    st.stop()
+# ------------------------------
+# 2. 读取数据
+# ------------------------------
+@st.cache_data
+def load_data():
+    df = pd.read_csv("data/stocks.csv")  # 相对路径
+    df['date'] = pd.to_datetime(df['date'])
+    df['Adj Close'] = df['prc'].abs()   # 确保收盘价正值
+    df.sort_values(['ticker', 'date'], inplace=True)
+    # 计算日收益率
+    df['Daily Return'] = df.groupby('ticker')['Adj Close'].pct_change()
+    return df
 
-# 读取数据并解析日期
-data = pd.read_csv(data_path, parse_dates=['DlyCalDt'])
+df = load_data()
 
-# 重命名列便于分析
-data.rename(columns={
-    'DlyCalDt': 'Date',
-    'DlyPrc': 'Close',
-    'DlyOpen': 'Open',
-    'DlyHigh': 'High',
-    'DlyLow': 'Low',
-    'DlyVol': 'Volume'
-}, inplace=True)
+# ------------------------------
+# 3. 侧边栏交互选项
+# ------------------------------
+tickers = df['ticker'].unique()
+selected_tickers = st.sidebar.multiselect("Select Stocks", tickers, default=tickers)
 
-# 按股票+日期排序
-data = data.sort_values(by=['Ticker', 'Date'])
+start_date = st.sidebar.date_input("Start Date", pd.to_datetime("2020-01-01"))
+end_date = st.sidebar.date_input("End Date", pd.to_datetime("2025-12-31"))
 
-# ======================
-# 2. 计算指标
-# ======================
-# 每日收益率
-data['Daily_Return'] = data.groupby('Ticker')['Close'].pct_change()
+show_moving_avg = st.sidebar.checkbox("Show 50-Day Moving Average", value=True)
+show_corr = st.sidebar.checkbox("Show Daily Return Correlation Heatmap", value=True)
+show_portfolio = st.sidebar.checkbox("Show Equal-Weight Portfolio", value=True)
 
-# 移动均线
-data['MA_7'] = data.groupby('Ticker')['Close'].transform(lambda x: x.rolling(7).mean())
-data['MA_30'] = data.groupby('Ticker')['Close'].transform(lambda x: x.rolling(30).mean())
-
-# 30 日滚动波动率
-data['Volatility_30'] = data.groupby('Ticker')['Daily_Return'].transform(lambda x: x.rolling(30).std())
-
-# ======================
-# 3. Streamlit 界面
-# ======================
-st.set_page_config(page_title="Interactive Stock Analysis", layout="wide")
-st.title("Interactive Stock Analysis Tool")
-
-# 选择股票
-tickers = data['Ticker'].unique().tolist()
-selected_tickers = st.multiselect("Select one or more stocks:", tickers, default=tickers)
-
-# 选择时间范围
-min_date = data['Date'].min()
-max_date = data['Date'].max()
-start_date, end_date = st.date_input(
-    "Select date range:",
-    [min_date, max_date],
-    min_value=min_date,
-    max_value=max_date
-)
-
-# 过滤数据
-filtered_data = data[
-    (data['Ticker'].isin(selected_tickers)) &
-    (data['Date'] >= pd.to_datetime(start_date)) &
-    (data['Date'] <= pd.to_datetime(end_date))
+# 筛选数据
+data_filtered = df[
+    (df['ticker'].isin(selected_tickers)) &
+    (df['date'] >= pd.to_datetime(start_date)) &
+    (df['date'] <= pd.to_datetime(end_date))
 ]
 
-if filtered_data.empty:
-    st.warning("No data available for the selected stocks and date range.")
-    st.stop()
-
-# ======================
-# 4. 绘图：收盘价 + 移动均线
-# ======================
-st.subheader("Stock Price with Moving Averages")
-fig_price = go.Figure()
+# ------------------------------
+# 4. 收盘价趋势
+# ------------------------------
+st.subheader("Adjusted Close Price Trend")
+fig, ax = plt.subplots(figsize=(10,5))
 for ticker in selected_tickers:
-    df = filtered_data[filtered_data['Ticker'] == ticker]
-    fig_price.add_trace(go.Scatter(x=df['Date'], y=df['Close'], mode='lines', name=f"{ticker} Close"))
-    fig_price.add_trace(go.Scatter(x=df['Date'], y=df['MA_7'], mode='lines', name=f"{ticker} MA7", line=dict(dash='dot')))
-    fig_price.add_trace(go.Scatter(x=df['Date'], y=df['MA_30'], mode='lines', name=f"{ticker} MA30", line=dict(dash='dash')))
+    temp = data_filtered[data_filtered['ticker']==ticker]
+    ax.plot(temp['date'], temp['Adj Close'], label=ticker)
+    if show_moving_avg:
+        ax.plot(temp['date'], temp['Adj Close'].rolling(50).mean(), linestyle='--', label=f"{ticker} 50-day MA")
+ax.set_xlabel("Date")
+ax.set_ylabel("Price ($)")
+ax.legend()
+st.pyplot(fig)
 
-fig_price.update_layout(height=500, width=1000, xaxis_title='Date', yaxis_title='Price')
-st.plotly_chart(fig_price, use_container_width=True)
-
-# ======================
-# 5. 日收益率直方图
-# ======================
-st.subheader("Daily Return Distribution")
+# ------------------------------
+# 5. 日收益率折线图
+# ------------------------------
+st.subheader("Daily Return")
+fig2, ax2 = plt.subplots(figsize=(10,5))
 for ticker in selected_tickers:
-    df = filtered_data[filtered_data['Ticker'] == ticker]
-    fig_hist = px.histogram(df, x='Daily_Return', nbins=50, title=f"{ticker} Daily Return Histogram")
-    st.plotly_chart(fig_hist, use_container_width=True)
+    temp = data_filtered[data_filtered['ticker']==ticker]
+    ax2.plot(temp['date'], temp['Daily Return'], label=ticker)
+ax2.set_xlabel("Date")
+ax2.set_ylabel("Daily Return")
+ax2.legend()
+st.pyplot(fig2)
 
-# ======================
-# 6. 30 日滚动波动率
-# ======================
-st.subheader("30-Day Rolling Volatility")
-fig_vol = go.Figure()
-for ticker in selected_tickers:
-    df = filtered_data[filtered_data['Ticker'] == ticker]
-    fig_vol.add_trace(go.Scatter(x=df['Date'], y=df['Volatility_30'], mode='lines', name=f"{ticker} Volatility"))
+# ------------------------------
+# 6. 日收益率相关性
+# ------------------------------
+if show_corr and len(selected_tickers) > 1:
+    st.subheader("Daily Return Correlation Heatmap")
+    pivot = data_filtered.pivot(index='date', columns='ticker', values='Daily Return')
+    corr = pivot[selected_tickers].corr()
+    fig3, ax3 = plt.subplots(figsize=(6,5))
+    sns.heatmap(corr, annot=True, cmap="coolwarm", ax=ax3)
+    st.pyplot(fig3)
 
-fig_vol.update_layout(height=500, width=1000, xaxis_title='Date', yaxis_title='Volatility')
-st.plotly_chart(fig_vol, use_container_width=True)
+# ------------------------------
+# 7. 简单等权组合累积收益率
+# ------------------------------
+if show_portfolio and len(selected_tickers) > 1:
+    st.subheader("Equal-Weight Portfolio Cumulative Return")
+    pivot = data_filtered.pivot(index='date', columns='ticker', values='Daily Return')
+    portfolio_ret = pivot[selected_tickers].mean(axis=1)
+    cumulative = (1 + portfolio_ret).cumprod()
+    fig4, ax4 = plt.subplots(figsize=(10,5))
+    ax4.plot(cumulative.index, cumulative, label="Portfolio")
+    ax4.set_xlabel("Date")
+    ax4.set_ylabel("Cumulative Return")
+    st.pyplot(fig4)
+
+# ------------------------------
+# 8. 数据下载
+# ------------------------------
+st.subheader("Download Filtered Data")
+st.write(data_filtered)
+csv = data_filtered.to_csv(index=False).encode('utf-8')
+st.download_button(
+    label="Download CSV",
+    data=csv,
+    file_name='filtered_stocks.csv',
+    mime='text/csv',
+)
