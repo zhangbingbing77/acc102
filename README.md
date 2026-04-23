@@ -21,6 +21,7 @@ This project is an interactive data analysis tool designed to explore historical
   - Simulate an equal-weight portfolio cumulative return
   - Allow interactive stock selection and time range filtering
   - Download filtered dataset as CSV
+  - Generate automated investment advice including return ranking, volatility analysis, trend signals and diversification insights
 
 ## 3. Dataset Description
 - **Data File:** `data/stock_data.csv` (full dataset, uploaded to GitHub)
@@ -74,19 +75,21 @@ The project files are organized as follows:
 - Correlation heatmap of selected stocks
 - Equal-weight portfolio cumulative return chart
 - Download filtered dataset as CSV
+- Automated Investment Advice Panel: Shows return ranking, volatility ranking, trend analysis and portfolio diversification summary
 
 ## 7. Key Analysis
 - Data Cleaning: Convert date column to datetime, ensure positive prices, forward-fill missing values
 - Feature Engineering: Compute Adj Close and Daily Return, calculate 50-day moving average
 - Pandas/Numpy Operations: Filtering by ticker and date range, groupby operations, cumulative product for portfolio return
-- Visualization: Matplotlib for line charts, Seaborn for correlation heatmap
-- Interactivity: Streamlit widgets for stock selection, date range, toggle options for moving averages, correlation, and portfolio
-
+- Visualization: Local analysis uses Matplotlib/Seaborn; Streamlit web app uses interactive Plotly charts
+- Interactivity: Streamlit widgets for stock selection, date range, toggle options for moving averages, correlation, portfolio and investment advice
+  
 ## 8. Results & Insights
 - Price Trends: AAPL and MSFT show steady growth; TSLA is highly volatile
 - Daily Returns: Most returns center around zero; TSLA and AMZN show occasional extreme changes
 - Correlation: High correlation between AAPL and MSFT; moderate correlations for AMZN and TSLA
 - Portfolio Performance: Equal-weight portfolio smooths individual stock volatility and provides a diversified return perspective
+- Investment Advice: Automatic summary of best performing stock, highest volatility stock, bullish/bearish trend signals and diversification level
 - Business Value: Users can visually compare multiple stocks, understand correlations, and simulate simple portfolios for decision-making
 
 ## 9. Limitations & Improvements
