@@ -1,11 +1,15 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
-import plotly.graph_objects as go
-import plotly.express as px
+import matplotlib.pyplot as plt
+import seaborn as sns
 from datetime import datetime
 
+# ----------------------------
+# Streamlit page configuration
+# ----------------------------
 st.set_page_config(layout="wide")
+sns.set_style("whitegrid")
 
 # ----------------------------
 # Load data
@@ -55,29 +59,33 @@ df_filtered = filter_data(data, selected_stocks, start_date, end_date)
 def generate_investment_advice(df, stocks):
     advice = []
 
+    # Cumulative return analysis
     cumulative_returns = df.groupby('Ticker')['AdjClose'].apply(lambda x: x.iloc[-1]/x.iloc[0]-1)
     top_stock = cumulative_returns.idxmax()
     bottom_stock = cumulative_returns.idxmin()
     advice.append(f"Highest cumulative return: {top_stock} ({cumulative_returns[top_stock]:.2%})")
     advice.append(f"Lowest cumulative return: {bottom_stock} ({cumulative_returns[bottom_stock]:.2%})")
 
+    # Volatility analysis
     volatility = df.groupby('Ticker')['DailyReturn'].std()
     high_vol = volatility.idxmax()
     low_vol = volatility.idxmin()
     advice.append(f"Highest volatility stock: {high_vol} ({volatility[high_vol]:.2%})")
     advice.append(f"Lowest volatility stock: {low_vol} ({volatility[low_vol]:.2%})")
 
+    # Trend analysis (price vs MA50)
     if show_ma:
         trend_advice = []
         for ticker in stocks:
             df_t = df[df['Ticker']==ticker].copy()
-            df_t['MA50'] = df_t['AdjClose'].rolling(50).mean()
+            df_t['MA50'] = df_t['AdjClose'].rolling(window=50).mean()
             if df_t['AdjClose'].iloc[-1] > df_t['MA50'].iloc[-1]:
                 trend_advice.append(f"{ticker}: bullish trend ↑")
             else:
                 trend_advice.append(f"{ticker}: pullback risk ↓")
         advice.append("Trend analysis: " + "; ".join(trend_advice))
 
+    # Portfolio correlation analysis
     if len(stocks) > 1:
         pivot_df = df.pivot(index='DlyCalDt', columns='Ticker', values='AdjClose')
         corr = pivot_df[stocks].pct_change().corr()
@@ -96,41 +104,49 @@ def generate_investment_advice(df, stocks):
 st.title("Interactive Stock Analysis Tool")
 st.write("Visualize and analyze historical stock data for selected tech companies.")
 
+# ----------------------------
+# Layout: 2 columns (charts | investment advice)
+# ----------------------------
 col1, col2 = st.columns([3,1])
 
 # ----------------------------
 # Charts column
 # ----------------------------
 with col1:
-    # Adjusted Close + MA50
+    # Adjusted Close Price + MA50
     st.subheader("Adjusted Close Price")
-    fig = go.Figure()
-    for ticker in selected_stocks:
+    fig, ax = plt.subplots(figsize=(12,5))
+    palette = sns.color_palette("tab10", n_colors=len(selected_stocks))
+    for i, ticker in enumerate(selected_stocks):
         df_t = df_filtered[df_filtered['Ticker']==ticker]
-        fig.add_trace(go.Scatter(x=df_t['DlyCalDt'], y=df_t['AdjClose'], mode='lines', name=ticker))
+        ax.plot(df_t['DlyCalDt'], df_t['AdjClose'], label=ticker, color=palette[i])
         if show_ma:
-            df_t['MA50'] = df_t['AdjClose'].rolling(50).mean()
-            fig.add_trace(go.Scatter(x=df_t['DlyCalDt'], y=df_t['MA50'], mode='lines', 
-                                     name=f"{ticker} MA50", line=dict(dash='dash')))
-    fig.update_layout(xaxis_title='Date', yaxis_title='Price ($)')
-    st.plotly_chart(fig, use_container_width=True)
+            df_t['MA50'] = df_t['AdjClose'].rolling(window=50).mean()
+            ax.plot(df_t['DlyCalDt'], df_t['MA50'], linestyle='--', color=palette[i], alpha=0.7)
+    ax.set_xlabel("Date")
+    ax.set_ylabel("Price ($)")
+    ax.legend()
+    st.pyplot(fig)
 
     # Daily Returns
     st.subheader("Daily Returns")
-    fig = go.Figure()
-    for ticker in selected_stocks:
+    fig, ax = plt.subplots(figsize=(12,5))
+    for i, ticker in enumerate(selected_stocks):
         df_t = df_filtered[df_filtered['Ticker']==ticker]
-        fig.add_trace(go.Scatter(x=df_t['DlyCalDt'], y=df_t['DailyReturn'], mode='lines', name=ticker))
-    fig.update_layout(xaxis_title='Date', yaxis_title='Daily Return')
-    st.plotly_chart(fig, use_container_width=True)
+        ax.plot(df_t['DlyCalDt'], df_t['DailyReturn'], label=ticker, color=palette[i])
+    ax.set_xlabel("Date")
+    ax.set_ylabel("Daily Return")
+    ax.legend()
+    st.pyplot(fig)
 
     # Correlation Heatmap
     if show_corr and len(selected_stocks) > 1:
         st.subheader("Correlation Heatmap")
         pivot_df = df_filtered.pivot(index='DlyCalDt', columns='Ticker', values='AdjClose')
         corr = pivot_df[selected_stocks].pct_change().corr()
-        fig = px.imshow(corr, text_auto=True, color_continuous_scale='RdBu_r', aspect="auto")
-        st.plotly_chart(fig, use_container_width=True)
+        fig, ax = plt.subplots(figsize=(6,5))
+        sns.heatmap(corr, annot=True, cmap='coolwarm', ax=ax)
+        st.pyplot(fig)
 
     # Equal-weight Portfolio
     if show_portfolio and len(selected_stocks) > 1:
@@ -139,11 +155,12 @@ with col1:
         daily_returns = pivot_df[selected_stocks].pct_change().fillna(0)
         portfolio_return = daily_returns.mean(axis=1)
         cumulative_return = (1 + portfolio_return).cumprod()
-        fig = go.Figure()
-        fig.add_trace(go.Scatter(x=cumulative_return.index, y=cumulative_return.values, 
-                                 mode='lines', name='Portfolio', line=dict(color='black', width=2)))
-        fig.update_layout(xaxis_title='Date', yaxis_title='Cumulative Return')
-        st.plotly_chart(fig, use_container_width=True)
+        fig, ax = plt.subplots(figsize=(12,5))
+        ax.plot(cumulative_return.index, cumulative_return.values, label='Portfolio', color='black', linewidth=2)
+        ax.set_xlabel("Date")
+        ax.set_ylabel("Cumulative Return")
+        ax.legend()
+        st.pyplot(fig)
 
 # ----------------------------
 # Investment advice column
